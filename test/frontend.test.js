@@ -286,6 +286,21 @@ describe('index.html gofile-style upload flow', () => {
     dom.window.close();
   });
 
+  it('expiry select has exactly the 4 required options, default Max 7 days', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const sel = window.document.getElementById('expirySelect');
+    const opts = Array.from(sel.options).map((o) => [o.value, o.textContent.trim()]);
+    assert.deepEqual(opts, [
+      ['1', 'After 1 hour'],
+      ['12', 'After 12 hours'],
+      ['24', 'After 24 hours'],
+      ['168', 'Max 7 days'],
+    ]);
+    assert.equal(sel.value, '168', 'default should be Max 7 days');
+    dom.window.close();
+  });
+
   it('renders my-files list from localStorage on load', async () => {
     const dom = bootDom();
     const { window } = dom;
