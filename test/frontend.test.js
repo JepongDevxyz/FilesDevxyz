@@ -218,6 +218,24 @@ describe('index.html gofile-style upload flow', () => {
     dom.window.close();
   });
 
+  it('link-styled buttons (Open file) have no underline and centered text', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const file = new window.File(['x'.repeat(1000)], 'a.png', { type: 'image/png' });
+    dropFile(window, file);
+    await settle();
+
+    const open = window.document.getElementById('sheetOpen');
+    assert.ok(open, 'expected #sheetOpen');
+    const cs = window.getComputedStyle(open);
+    assert.equal(cs.textDecorationLine, 'none', 'link button must not be underlined');
+    // inline-flex in the static DOM; a real browser blockifies it to flex as a flex item
+    assert.ok(cs.display === 'flex' || cs.display === 'inline-flex', 'link button should be a flex box, got ' + cs.display);
+    assert.equal(cs.alignItems, 'center', 'link button text must be vertically centered');
+    assert.equal(cs.justifyContent, 'center', 'link button text must be horizontally centered');
+    dom.window.close();
+  });
+
   it('renders my-files list from localStorage on load', async () => {
     const dom = bootDom();
     const { window } = dom;
