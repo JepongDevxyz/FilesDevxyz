@@ -1,0 +1,1 @@
+{"rewrites":[{"destination":"/f.html?id=:id","source":"/f/:id"}]}

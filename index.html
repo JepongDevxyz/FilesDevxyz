@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilesDevxyz — Upload & Share</title>
+<style>
+  :root { --bg:#0b0f1a; --card:#141b2e; --line:#24304d; --txt:#e8edf7; --mut:#8b96b3;
+          --acc:#4f8cff; --acc2:#7c5cff; --ok:#2fbf71; --err:#ff5d6c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 64px; }
+  header { text-align:center; margin:24px 0 28px; }
+  header h1 { font-size:32px; letter-spacing:.5px; }
+  header h1 span { background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text;
+                   background-clip:text; color:transparent; }
+  header p { color:var(--mut); margin-top:8px; font-size:14px; }
+  main { width:100%; max-width:640px; }
+  #dropzone { border:2px dashed var(--line); border-radius:16px; background:var(--card);
+              padding:48px 24px; text-align:center; cursor:pointer; transition:.15s; }
+  #dropzone:hover, #dropzone.over { border-color:var(--acc); background:#17203a; }
+  #dropzone .big { font-size:15px; font-weight:600; }
+  #dropzone .sub { color:var(--mut); font-size:13px; margin-top:8px; }
+  .opts { display:flex; gap:12px; margin:16px 0; flex-wrap:wrap; }
+  .opts label { flex:1 1 200px; font-size:12px; color:var(--mut); display:flex; flex-direction:column; gap:6px; }
+  .opts input, .opts select { background:var(--card); border:1px solid var(--line); color:var(--txt);
+      border-radius:10px; padding:10px 12px; font-size:14px; outline:none; }
+  .opts input:focus, .opts select:focus { border-color:var(--acc); }
+  #uploads { display:flex; flex-direction:column; gap:12px; margin-top:8px; }
+  .up-card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .up-name { font-size:14px; font-weight:600; word-break:break-all; }
+  .up-meta { font-size:12px; color:var(--mut); margin-top:2px; }
+  .up-bar { height:8px; background:#0b0f1a; border-radius:99px; margin-top:10px; overflow:hidden; }
+  .up-fill { height:100%; width:0%; border-radius:99px;
+             background:linear-gradient(90deg,var(--acc),var(--acc2)); transition:width .15s; }
+  .up-status { font-size:12px; color:var(--mut); margin-top:8px; }
+  .up-card.error .up-status { color:var(--err); }
+  .up-result { display:flex; gap:8px; margin-top:10px; align-items:center; }
+  .up-result input { flex:1; background:#0b0f1a; border:1px solid var(--line); color:var(--txt);
+      border-radius:8px; padding:8px 10px; font-size:12px; }
+  .btn { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:#fff; border:0; border-radius:8px;
+         padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); }
+  section.mine { margin-top:32px; width:100%; }
+  section.mine h2 { font-size:16px; margin-bottom:12px; }
+  .myfile { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line);
+            border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+  .myfile .n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .myfile .s { color:var(--mut); font-size:12px; white-space:nowrap; }
+  .myfile a { color:var(--acc); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .myfile button { background:none; border:0; color:var(--err); cursor:pointer; font-size:14px; }
+  .empty { color:var(--mut); font-size:13px; text-align:center; padding:16px; }
+  footer { margin-top:48px; color:var(--mut); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Files<span>Devxyz</span></h1>
+  <p>Your own file host. Upload anything, share the link.</p>
+</header>
+
+<main>
+  <div id="dropzone" role="button" tabindex="0" aria-label="Upload files">
+    <div class="big">Drop files here or tap to browse</div>
+    <div class="sub">Files go straight to your private storage — links look like <b>/f/AbC12345</b></div>
+  </div>
+  <input type="file" id="fileInput" hidden multiple>
+
+  <div class="opts">
+    <label>Password (optional)
+      <input type="password" id="pwInput" placeholder="Protect the link" autocomplete="off">
+    </label>
+    <label>Link expires
+      <select id="expirySelect">
+        <option value="">Never</option>
+        <option value="1">After 1 hour</option>
+        <option value="24">After 24 hours</option>
+        <option value="168">After 7 days</option>
+        <option value="720">After 30 days</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="uploads"></div>
+
+  <section class="mine">
+    <h2>My files</h2>
+    <div id="myFiles"></div>
+  </section>
+</main>
+
+<footer>Powered by Jepong Devxyz</footer>
+
+<script>
+(function () {
+  'use strict';
+  var SINGLE_PART_MAX = 100 * 1024 * 1024; // must match api/sign-upload.js
+  var LS_KEY = 'filesdevxyz:files';
+
+  function el(id) { return document.getElementById(id); }
+  function fmtBytes(n) {
+    if (!n && n !== 0) return '';
+    var u = ['B','KB','MB','GB','TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (Math.round(n * 10) / 10) + ' ' + u[i];
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  // ---------- my files (localStorage) ----------
+  function getMyFiles() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveToMyFiles(entry) {
+    var list = getMyFiles().filter(function (f) { return f.id !== entry.id; });
+    list.unshift(entry);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 200))); } catch (e) {}
+    renderMyFiles();
+  }
+  function removeMyFile(id) {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(getMyFiles().filter(function (f) { return f.id !== id; })));
+    } catch (e) {}
+    renderMyFiles();
+  }
+  function renderMyFiles() {
+    var box = el('myFiles');
+    var list = getMyFiles();
+    if (!list.length) { box.innerHTML = '<div class="empty">No uploads yet on this device.</div>'; return; }
+    box.innerHTML = list.map(function (f) {
+      return '<div class="myfile" data-id="' + esc(f.id) + '">' +
+        '<span class="n" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
+        '<span class="s">' + esc(fmtBytes(f.size)) + '</span>' +
+        '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">Open</a>' +
+        '<button data-del="' + esc(f.id) + '" aria-label="Remove">&times;</button>' +
+        '</div>';
+    }).join('');
+    box.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () { removeMyFile(b.getAttribute('data-del')); });
+    });
+  }
+
+  // ---------- XHR PUT with progress ----------
+  function putWithProgress(url, blob, contentType, onProgress, retries) {
+    retries = retries == null ? 1 : retries;
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      if (contentType) xhr.setRequestHeader('Content-Type', contentType);
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.getResponseHeader('ETag'));
+        } else if (retries > 0) {
+          resolve(putWithProgress(url, blob, contentType, onProgress, retries - 1));
+        } else {
+          reject(new Error('upload failed (HTTP ' + xhr.status + ')'));
+        }
+      };
+      xhr.onerror = function () {
+        if (retries > 0) resolve(putWithProgress(url, blob, contentType, onProgress, retries - 1));
+        else reject(new Error('network error during upload'));
+      };
+      xhr.send(blob);
+    });
+  }
+
+  async function postJSON(url, body) {
+    var r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var data = await r.json().catch(function () { return {}; });
+    if (!r.ok) throw new Error(data.error || ('request failed (' + r.status + ')'));
+    return data;
+  }
+
+  // ---------- upload flows ----------
+  function makeCard(file) {
+    var card = document.createElement('div');
+    card.className = 'up-card';
+    card.innerHTML =
+      '<div class="up-name">' + esc(file.name) + '</div>' +
+      '<div class="up-meta">' + esc(fmtBytes(file.size)) + '</div>' +
+      '<div class="up-bar"><div class="up-fill"></div></div>' +
+      '<div class="up-status">Preparing…</div>' +
+      '<div class="up-result" hidden></div>';
+    el('uploads').prepend(card);
+    return {
+      card: card,
+      fill: card.querySelector('.up-fill'),
+      status: card.querySelector('.up-status'),
+      result: card.querySelector('.up-result'),
+      setProgress: function (loaded, total) {
+        var pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+        this.fill.style.width = pct + '%';
+        this.status.textContent = 'Uploading… ' + pct + '%';
+      },
+      fail: function (msg) {
+        card.classList.add('error');
+        this.status.textContent = 'Failed: ' + msg;
+      },
+      done: function (id, downloadUrl, file) {
+        this.fill.style.width = '100%';
+        this.status.textContent = 'Done ✓';
+        var abs = location.origin + downloadUrl;
+        this.result.hidden = false;
+        this.result.innerHTML =
+          '<input readonly value="' + esc(abs) + '">' +
+          '<button class="btn ghost up-copy" type="button">Copy</button>' +
+          '<a class="btn up-link" href="' + esc(downloadUrl) + '" target="_blank" rel="noopener">Open</a>';
+        var input = this.result.querySelector('input');
+        this.result.querySelector('.up-copy').addEventListener('click', function () {
+          copyText(abs, input);
+        });
+        saveToMyFiles({ id: id, name: file.name, size: file.size, url: downloadUrl, at: Date.now() });
+      },
+    };
+  }
+
+  function copyText(text, input) {
+    function fallback() {
+      try { input.select(); document.execCommand('copy'); } catch (e) {}
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(fallback);
+    } else fallback();
+  }
+
+  function signPayload(file) {
+    var p = {
+      filename: file.name,
+      contentType: file.type || 'application/octet-stream',
+      size: file.size,
+    };
+    var pw = el('pwInput').value;
+    if (pw) p.password = pw;
+    var exp = el('expirySelect').value;
+    if (exp) p.expiresInHours = Number(exp);
+    return p;
+  }
+
+  async function uploadSingle(file, ui) {
+    ui.status.textContent = 'Requesting upload slot…';
+    var signed = await postJSON('/api/sign-upload', signPayload(file));
+    await putWithProgress(signed.uploadUrl, file, file.type || 'application/octet-stream',
+      function (loaded, total) { ui.setProgress(loaded, total); });
+    ui.done(signed.id, signed.downloadUrl, file);
+  }
+
+  async function uploadMultipart(file, ui) {
+    ui.status.textContent = 'Starting multipart upload…';
+    var signed = await postJSON('/api/sign-part', signPayload(file));
+    var partSize = signed.partSize;
+    var parts = [];
+    var done_bytes = 0;
+    for (var i = 0; i < signed.partUrls.length; i++) {
+      var start = i * partSize;
+      var end = Math.min(start + partSize, file.size);
+      var blob = file.slice(start, end);
+      var etag = await putWithProgress(signed.partUrls[i], blob, null,
+        function (loaded) { ui.setProgress(done_bytes + loaded, file.size); });
+      done_bytes = end;
+      ui.setProgress(done_bytes, file.size);
+      parts.push({ ETag: etag, PartNumber: i + 1 });
+    }
+    ui.status.textContent = 'Finalizing…';
+    var done = await postJSON('/api/complete-multipart', {
+      key: signed.key, uploadId: signed.uploadId, parts: parts,
+    });
+    ui.done(done.id, done.downloadUrl, file);
+  }
+
+  async function startUpload(file) {
+    if (!file || file.size <= 0) return;
+    var ui = makeCard(file);
+    try {
+      if (file.size > SINGLE_PART_MAX) await uploadMultipart(file, ui);
+      else await uploadSingle(file, ui);
+    } catch (e) {
+      ui.fail(e.message || 'unknown error');
+    }
+  }
+
+  // ---------- dropzone wiring ----------
+  var dz = el('dropzone'), fi = el('fileInput');
+  dz.addEventListener('click', function () { fi.click(); });
+  dz.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+  });
+  fi.addEventListener('change', function () {
+    Array.prototype.forEach.call(fi.files, startUpload);
+    fi.value = '';
+  });
+  ['dragenter', 'dragover'].forEach(function (t) {
+    dz.addEventListener(t, function (e) { e.preventDefault(); dz.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (t) {
+    dz.addEventListener(t, function (e) { e.preventDefault(); dz.classList.remove('over'); });
+  });
+  dz.addEventListener('drop', function (e) {
+    var files = (e.dataTransfer && e.dataTransfer.files) || [];
+    Array.prototype.forEach.call(files, startUpload);
+  });
+
+  document.addEventListener('DOMContentLoaded', renderMyFiles);
+  renderMyFiles();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilesDevxyz — Download</title>
+<style>
+  :root { --bg:#0b0f1a; --card:#141b2e; --line:#24304d; --txt:#e8edf7; --mut:#8b96b3;
+          --acc:#4f8cff; --acc2:#7c5cff; --err:#ff5d6c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px; }
+  header { margin:24px 0 28px; }
+  header a { font-size:24px; font-weight:700; text-decoration:none; color:var(--txt); }
+  header a span { background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text;
+                  background-clip:text; color:transparent; }
+  .card { width:100%; max-width:480px; background:var(--card); border:1px solid var(--line);
+          border-radius:16px; padding:28px 24px; text-align:center; }
+  .file-icon { font-size:44px; }
+  #fileName { font-size:17px; font-weight:600; margin:12px 0 4px; word-break:break-all; }
+  .meta { color:var(--mut); font-size:13px; margin-bottom:20px; }
+  .btn { display:inline-block; background:linear-gradient(90deg,var(--acc),var(--acc2)); color:#fff;
+         border:0; border-radius:10px; padding:12px 32px; font-size:15px; font-weight:600;
+         cursor:pointer; text-decoration:none; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  #pwForm { margin-top:16px; }
+  #pwForm input { width:100%; background:#0b0f1a; border:1px solid var(--line); color:var(--txt);
+      border-radius:10px; padding:12px; font-size:15px; margin-bottom:10px; outline:none; text-align:center; }
+  #pwForm input:focus { border-color:var(--acc); }
+  #pwError { color:var(--err); font-size:13px; min-height:18px; margin-top:8px; }
+  #errCard .e { font-size:44px; }
+  #errMsg { margin-top:12px; font-size:15px; }
+  #errCard p.sub { color:var(--mut); font-size:13px; margin-top:8px; }
+  .spin { width:36px; height:36px; border:3px solid var(--line); border-top-color:var(--acc);
+          border-radius:50%; margin:8px auto; animation:sp 0.8s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  footer { margin-top:40px; color:var(--mut); font-size:12px; }
+</style>
+</head>
+<body>
+<header><a href="/">Files<span>Devxyz</span></a></header>
+
+<div class="card" id="loadingCard">
+  <div class="spin"></div>
+  <p class="meta">Looking up your file…</p>
+</div>
+
+<div class="card" id="fileCard" hidden>
+  <div class="file-icon">📄</div>
+  <div id="fileName"></div>
+  <div class="meta" id="fileMeta"></div>
+  <a class="btn" id="dlBtn" href="#" download>Download</a>
+</div>
+
+<div class="card" id="pwCard" hidden>
+  <div class="file-icon">🔒</div>
+  <div id="fileNamePw" style="font-weight:600;margin:12px 0 4px;"></div>
+  <p class="meta">This file is password protected.</p>
+  <form id="pwForm">
+    <input type="password" id="pwInput" placeholder="Enter password" autocomplete="off">
+    <button class="btn" type="submit" style="width:100%;">Unlock</button>
+    <div id="pwError"></div>
+  </form>
+</div>
+
+<div class="card" id="errCard" hidden>
+  <div class="e" id="errIcon">😕</div>
+  <div id="errMsg"></div>
+  <p class="sub">The link may be wrong, removed, or expired.</p>
+</div>
+
+<footer>Powered by Jepong Devxyz</footer>
+
+<script>
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function show(id) {
+    ['loadingCard', 'fileCard', 'pwCard', 'errCard'].forEach(function (c) {
+      $(c).hidden = c !== id;
+    });
+  }
+  function fmtBytes(n) {
+    if (n == null) return '';
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (Math.round(n * 10) / 10) + ' ' + u[i];
+  }
+  function fail(msg, icon) {
+    $('errMsg').textContent = msg;
+    if (icon) $('errIcon').textContent = icon;
+    show('errCard');
+  }
+
+  function fileId() {
+    var q = new URLSearchParams(location.search).get('id');
+    if (q) return q;
+    var m = location.pathname.match(/\/f\/([A-Za-z0-9]{8})/);
+    return m ? m[1] : null;
+  }
+
+  async function lookup(password) {
+    var id = fileId();
+    if (!id) { fail('Invalid download link.', '🔗'); return; }
+    show('loadingCard');
+    var url = '/api/resolve?id=' + encodeURIComponent(id);
+    if (password) url += '&password=' + encodeURIComponent(password);
+    var r, data;
+    try {
+      r = await fetch(url);
+      data = await r.json();
+    } catch (e) {
+      fail('Network error. Check your connection and try again.', '📡');
+      return;
+    }
+    if (r.status === 404) { fail('File not found.', '😕'); return; }
+    if (r.status === 410) { fail('This link has expired.', '⌛'); return; }
+    if (r.status === 403 && data.passwordProtected) {
+      $('fileNamePw').textContent = 'Protected file';
+      $('pwError').textContent = password ? (data.error || 'Wrong password.') : '';
+      $('pwInput').value = '';
+      show('pwCard');
+      $('pwInput').focus();
+      return;
+    }
+    if (!r.ok) { fail(data.error || 'Something went wrong.', '😕'); return; }
+
+    $('fileName').textContent = data.filename || 'file';
+    var meta = fmtBytes(data.size);
+    if (data.expiresAt) {
+      var d = new Date(Number(data.expiresAt));
+      meta += ' · expires ' + d.toLocaleString();
+    }
+    $('fileMeta').textContent = meta;
+    var btn = $('dlBtn');
+    btn.href = data.url;
+    btn.setAttribute('download', data.filename || 'file');
+    show('fileCard');
+  }
+
+  $('pwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pw = $('pwInput').value;
+    if (!pw) { $('pwError').textContent = 'Please enter the password.'; return; }
+    lookup(pw);
+  });
+
+  lookup(null);
+})();
+</script>
+</body>
+</html>
