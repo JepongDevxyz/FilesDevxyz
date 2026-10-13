@@ -102,4 +102,20 @@ describe('f.html download page', () => {
     assert.ok(window.document.getElementById('errMsg').textContent.toLowerCase().includes('not found'));
     dom.window.close();
   });
+
+  it('shows a branded bottom-center toast when Download is clicked', async () => {
+    const dom = bootDom('ok');
+    const { window } = dom;
+    await settle();
+
+    window.document.getElementById('dlBtn').click();
+    await settle(50);
+
+    const toast = window.document.getElementById('toast');
+    assert.ok(toast, 'expected a #toast element');
+    assert.ok(toast.classList.contains('show'), 'toast should be visible after download click');
+    assert.match(toast.textContent, /Powered by Jepong Devxyz/);
+    assert.match(toast.textContent, /preparing.*download/i);
+    dom.window.close();
+  });
 });

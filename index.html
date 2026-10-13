@@ -53,6 +53,13 @@
   footer { margin-top:48px; color:var(--mut); font-size:12px; text-align:center; line-height:1.9; }
   footer a { color:var(--mut); text-decoration:underline; text-underline-offset:3px; }
   footer a:hover { color:#fff; }
+  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(16px);
+           background:#1a2340; border:1px solid var(--line); color:var(--txt);
+           border-radius:12px; padding:12px 20px; font-size:13px; text-align:center;
+           opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+           z-index:9999; max-width:calc(100vw - 48px); box-shadow:0 8px 30px rgba(0,0,0,.45); }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast .brand { display:block; font-size:10px; color:var(--mut); margin-top:4px; }
 </style>
 </head>
 <body>
@@ -97,6 +104,8 @@
   <div>Powered by Jepong Devxyz</div>
 </footer>
 
+<div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><span class="brand">Powered by Jepong Devxyz</span></div>
+
 <script>
 (function () {
   'use strict';
@@ -104,6 +113,16 @@
   var LS_KEY = 'filesdevxyz:files';
 
   function el(id) { return document.getElementById(id); }
+
+  // ---------- bottom-center branded toast ----------
+  var toastTimer = null;
+  function toast(msg) {
+    el('toastMsg').textContent = msg;
+    var t = el('toast');
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
   function fmtBytes(n) {
     if (!n && n !== 0) return '';
     var u = ['B','KB','MB','GB','TB'], i = 0;
@@ -212,6 +231,7 @@
       fail: function (msg) {
         card.classList.add('error');
         this.status.textContent = 'Failed: ' + msg;
+        toast('Upload failed: ' + msg);
       },
       done: function (id, downloadUrl, file) {
         this.fill.style.width = '100%';
@@ -225,8 +245,10 @@
         var input = this.result.querySelector('input');
         this.result.querySelector('.up-copy').addEventListener('click', function () {
           copyText(abs, input);
+          toast('Link copied to clipboard');
         });
         saveToMyFiles({ id: id, name: file.name, size: file.size, url: downloadUrl, at: Date.now() });
+        toast('Upload complete — link ready');
       },
     };
   }

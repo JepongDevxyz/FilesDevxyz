@@ -188,4 +188,28 @@ describe('index.html upload flow', () => {
     assert.ok(items[0].textContent.includes('old.apk'));
     dom.window.close();
   });
+
+  it('shows a branded bottom-center toast on upload done and on copy', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const file = new window.File(['x'.repeat(1000)], 'test-app.apk', {
+      type: 'application/vnd.android.package-archive',
+    });
+
+    dropFile(window, file);
+    await settle();
+
+    const toast = window.document.getElementById('toast');
+    assert.ok(toast, 'expected a #toast element');
+    assert.ok(toast.classList.contains('show'), 'toast should be visible after upload completes');
+    assert.match(toast.textContent, /Powered by Jepong Devxyz/);
+    assert.match(toast.textContent, /upload complete/i);
+
+    window.document.querySelector('.up-copy').click();
+    await settle(50);
+    assert.ok(toast.classList.contains('show'), 'toast should be visible after copy');
+    assert.match(toast.textContent, /copied/i);
+
+    dom.window.close();
+  });
 });
