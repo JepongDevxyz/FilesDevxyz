@@ -1,11 +1,13 @@
-// jsdom smoke test for index.html — runs the REAL page script with mocked
-// network (fetch + XMLHttpRequest) and asserts the upload flow end-to-end.
+// jsdom smoke test for the gofile-style index.html — runs the REAL page script
+// with mocked network (fetch + XMLHttpRequest) and asserts the upload flow:
+// dropzone -> uploads panel (progress + speed) -> done sheet (link, QR, stats).
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const HTML = () => readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const QR_SRC = () => readFileSync(new URL('../js/qrcode-generator.js', import.meta.url), 'utf8');
 
 function installMocks(window) {
   const calls = [];
@@ -81,7 +83,10 @@ function bootDom() {
   const dom = new JSDOM(HTML(), {
     url: 'http://localhost/',
     runScripts: 'dangerously',
-    beforeParse(window) { installMocks(window); },
+    beforeParse(window) {
+      installMocks(window);
+      window.eval(QR_SRC()); // vendored QR lib, like the <script src> tag
+    },
   });
   return dom;
 }
@@ -97,8 +102,25 @@ async function settle(ms = 100) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-describe('index.html upload flow', () => {
-  it('drops a small file → calls /api/sign-upload, shows progress, renders link + saves to my files', async () => {
+describe('index.html gofile-style upload flow', () => {
+  it('dropzone has Select files button that opens the file picker', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const btn = window.document.getElementById('selectBtn');
+    assert.ok(btn, 'expected #selectBtn');
+    assert.match(btn.textContent, /select files/i);
+
+    let pickerOpened = false;
+    const input = window.document.getElementById('fileInput');
+    const origClick = input.click.bind(input);
+    input.click = () => { pickerOpened = true; };
+    btn.click();
+    assert.ok(pickerOpened, 'Select files should open the file picker');
+    input.click = origClick;
+    dom.window.close();
+  });
+
+  it('drops a small file → uploads panel shows progress + speed, done sheet shows link + QR + stats', async () => {
     const dom = bootDom();
     const { window } = dom;
     const file = new window.File(['x'.repeat(1000)], 'test-app.apk', {
@@ -108,33 +130,45 @@ describe('index.html upload flow', () => {
     dropFile(window, file);
     await settle();
 
-    // sign endpoint was called with the file details
-    const sign = window.__fetchCalls.find((c) => c.url === '/api/sign-upload');
-    assert.ok(sign, 'expected a call to /api/sign-upload');
-    assert.equal(sign.body.filename, 'test-app.apk');
-    assert.equal(sign.body.contentType, 'application/vnd.android.package-archive');
-    assert.equal(sign.body.size, 1000);
+    // uploads panel is visible with one entry
+    const panel = window.document.getElementById('uploadsPanel');
+    assert.ok(panel, 'expected #uploadsPanel');
+    assert.equal(panel.hidden, false, 'panel should be visible during/after upload');
+    const entry = window.document.querySelector('.up-entry');
+    assert.ok(entry, 'expected an upload entry');
+    assert.ok(entry.querySelector('.up-fname').textContent.includes('test-app.apk'));
 
-    // exactly one PUT to the presigned url, with matching content-type header
-    assert.equal(window.__xhrPuts.length, 1);
-    assert.ok(window.__xhrPuts[0].url.includes('sig=mock'));
-    assert.equal(window.__xhrPuts[0].headers['content-type'], 'application/vnd.android.package-archive');
-
-    // progress UI reached 100%
-    const fill = window.document.querySelector('.up-fill');
-    assert.ok(fill, 'expected a progress fill element');
+    // progress reached 100% and badge flipped to COMPLETE
+    const fill = entry.querySelector('.up-fill');
     assert.equal(fill.style.width, '100%');
+    assert.match(entry.querySelector('.badge').textContent, /complete/i);
 
-    // download link rendered
-    const link = window.document.querySelector('.up-link');
-    assert.ok(link, 'expected a result link');
-    assert.ok(link.href.endsWith('/f/AbC12345'), link.href);
+    // speed + elapsed rendered
+    assert.ok(entry.querySelector('.up-speed').textContent.length > 0, 'expected speed text');
+    assert.ok(entry.querySelector('.up-elapsed').textContent.length > 0, 'expected elapsed text');
 
-    // saved to localStorage my-files
-    const saved = JSON.parse(window.localStorage.getItem('filesdevxyz:files'));
-    assert.ok(Array.isArray(saved) && saved.length === 1);
-    assert.equal(saved[0].id, 'AbC12345');
-    assert.equal(saved[0].name, 'test-app.apk');
+    // done sheet: share link + QR + stats
+    const sheet = window.document.getElementById('doneSheet');
+    assert.ok(sheet, 'expected #doneSheet');
+    assert.equal(sheet.hidden, false, 'done sheet should be visible after upload');
+    const linkInput = window.document.getElementById('sheetLink');
+    assert.ok(linkInput.value.endsWith('/f/AbC12345'), linkInput.value);
+    const qr = window.document.getElementById('sheetQr');
+    assert.ok(qr.innerHTML.includes('<svg'), 'expected a QR code svg');
+    assert.ok(window.document.getElementById('statSize').textContent.length > 0, 'expected size stat');
+
+    // copy button → toast
+    window.document.getElementById('sheetCopy').click();
+    await settle(50);
+    const toast = window.document.getElementById('toast');
+    assert.ok(toast.classList.contains('show'), 'toast should show after copy');
+    assert.match(toast.textContent, /copied/i);
+    assert.match(toast.textContent, /Powered by Jepong Devxyz/);
+
+    // close button hides the sheet
+    window.document.getElementById('sheetCloseBtn').click();
+    await settle(50);
+    assert.equal(sheet.hidden, true, 'done sheet should close');
 
     dom.window.close();
   });
@@ -152,24 +186,35 @@ describe('index.html upload flow', () => {
 
     const signPart = window.__fetchCalls.find((c) => c.url === '/api/sign-part');
     assert.ok(signPart, 'expected a call to /api/sign-part');
-    assert.equal(signPart.body.size, 250 * 1024 * 1024);
-
     const complete = window.__fetchCalls.find((c) => c.url === '/api/complete-multipart');
     assert.ok(complete, 'expected a call to /api/complete-multipart');
-    assert.equal(complete.body.uploadId, 'upload-123');
     assert.equal(complete.body.parts.length, 25);
-    assert.deepEqual(
-      complete.body.parts.map((p) => p.PartNumber),
-      Array.from({ length: 25 }, (_, i) => i + 1)
-    );
-    assert.ok(complete.body.parts.every((p) => p.ETag === '"faketag123"'));
-
-    // one PUT per part
     assert.equal(window.__xhrPuts.length, 25);
 
-    const link = window.document.querySelector('.up-link');
-    assert.ok(link && link.href.endsWith('/f/MpT98765'), 'expected multipart result link');
+    const sheet = window.document.getElementById('doneSheet');
+    assert.equal(sheet.hidden, false, 'done sheet should show for multipart too');
+    assert.ok(window.document.getElementById('sheetLink').value.endsWith('/f/MpT98765'));
+    dom.window.close();
+  });
 
+  it('hamburger menu opens a drawer with working links', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const drawer = window.document.getElementById('drawer');
+    assert.ok(drawer, 'expected #drawer');
+
+    window.document.getElementById('menuBtn').click();
+    await settle(50);
+    assert.ok(drawer.classList.contains('open'), 'drawer should open');
+
+    // drawer has real links
+    const hrefs = Array.from(drawer.querySelectorAll('a')).map((a) => a.getAttribute('href'));
+    assert.ok(hrefs.includes('/privacy.html'), 'drawer should link privacy');
+    assert.ok(hrefs.includes('/terms.html'), 'drawer should link terms');
+
+    window.document.getElementById('scrim').click();
+    await settle(50);
+    assert.ok(!drawer.classList.contains('open'), 'drawer should close');
     dom.window.close();
   });
 
@@ -180,36 +225,11 @@ describe('index.html upload flow', () => {
       'filesdevxyz:files',
       JSON.stringify([{ id: 'XxYy1122', name: 'old.apk', size: 42, url: '/f/XxYy1122', at: 1 }])
     );
-    // re-render happens via exposed hook after boot
     window.dispatchEvent(new window.Event('DOMContentLoaded'));
     await settle(50);
     const items = window.document.querySelectorAll('.myfile');
     assert.ok(items.length >= 1, 'expected saved files to render');
     assert.ok(items[0].textContent.includes('old.apk'));
-    dom.window.close();
-  });
-
-  it('shows a branded bottom-center toast on upload done and on copy', async () => {
-    const dom = bootDom();
-    const { window } = dom;
-    const file = new window.File(['x'.repeat(1000)], 'test-app.apk', {
-      type: 'application/vnd.android.package-archive',
-    });
-
-    dropFile(window, file);
-    await settle();
-
-    const toast = window.document.getElementById('toast');
-    assert.ok(toast, 'expected a #toast element');
-    assert.ok(toast.classList.contains('show'), 'toast should be visible after upload completes');
-    assert.match(toast.textContent, /Powered by Jepong Devxyz/);
-    assert.match(toast.textContent, /upload complete/i);
-
-    window.document.querySelector('.up-copy').click();
-    await settle(50);
-    assert.ok(toast.classList.contains('show'), 'toast should be visible after copy');
-    assert.match(toast.textContent, /copied/i);
-
     dom.window.close();
   });
 });

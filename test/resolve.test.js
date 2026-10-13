@@ -39,7 +39,7 @@ function makeFakeClient(store, captured) {
           e.name = 'NotFound';
           throw e;
         }
-        return { Metadata: found.metadata, ContentLength: found.size };
+        return { Metadata: found.metadata, ContentLength: found.size, ContentType: 'application/pdf' };
       }
       throw new Error('unexpected command: ' + name);
     },
@@ -89,6 +89,7 @@ describe('resolve', () => {
     assert.ok(res.body.url.includes('report.pdf'));
     assert.equal(res.body.filename, 'report.pdf');
     assert.equal(res.body.size, 123456);
+    assert.equal(res.body.contentType, 'application/pdf');
     assert.equal(res.body.passwordProtected, false);
     assert.equal(presignCaptured[0].opts.expiresIn, DOWNLOAD_URL_TTL_SECONDS);
 

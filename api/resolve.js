@@ -79,6 +79,7 @@ export function buildResolveHandler(deps = {}) {
         url,
         filename,
         size: head.ContentLength ?? null,
+        contentType: head.ContentType || null,
         expiresAt: meta['x-amz-meta-exp'] || null,
         passwordProtected,
       });

@@ -17,8 +17,14 @@
   .card { width:100%; max-width:480px; background:var(--card); border:1px solid var(--line);
           border-radius:16px; padding:28px 24px; text-align:center; }
   .file-icon { font-size:44px; }
+  #preview { display:flex; justify-content:center; margin:4px 0 8px; }
+  #preview img { max-width:100%; max-height:320px; border-radius:12px; border:1px solid var(--line); }
   #fileName { font-size:17px; font-weight:600; margin:12px 0 4px; word-break:break-all; }
   .meta { color:var(--mut); font-size:13px; margin-bottom:20px; }
+  .stats { display:flex; gap:8px; margin:0 0 20px; }
+  .stat { flex:1; background:#0b0f1a; border:1px solid var(--line); border-radius:10px;
+          padding:10px 6px; font-size:11px; color:var(--mut); }
+  .stat b { display:block; font-size:14px; color:var(--txt); margin-bottom:2px; }
   .btn { display:inline-block; background:linear-gradient(90deg,var(--acc),var(--acc2)); color:#fff;
          border:0; border-radius:10px; padding:12px 32px; font-size:15px; font-weight:600;
          cursor:pointer; text-decoration:none; }
@@ -54,8 +60,13 @@
 
 <div class="card" id="fileCard" hidden>
   <div class="file-icon">📄</div>
+  <div id="preview"></div>
   <div id="fileName"></div>
   <div class="meta" id="fileMeta"></div>
+  <div class="stats">
+    <div class="stat"><b id="statSize">–</b>size</div>
+    <div class="stat"><b id="statType">–</b>type</div>
+  </div>
   <a class="btn" id="dlBtn" href="#" download>Download</a>
 </div>
 
@@ -151,6 +162,16 @@
       meta += ' · expires ' + d.toLocaleString();
     }
     $('fileMeta').textContent = meta;
+    $('statSize').textContent = fmtBytes(data.size);
+    $('statType').textContent = (data.contentType || '').split('/')[1] || 'file';
+    // image preview, like gofile's thumbnail
+    var ct = data.contentType || '';
+    if (ct.indexOf('image/') === 0) {
+      $('preview').innerHTML = '<img src="' + data.url.replace(/"/g, '&quot;') +
+        '" alt="preview" loading="lazy">';
+    } else {
+      $('preview').innerHTML = '';
+    }
     var btn = $('dlBtn');
     btn.href = data.url;
     btn.setAttribute('download', data.filename || 'file');

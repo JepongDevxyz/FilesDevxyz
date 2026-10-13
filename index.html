@@ -4,43 +4,102 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FilesDevxyz — Upload & Share</title>
+<script src="/js/qrcode-generator.js"></script>
 <style>
-  :root { --bg:#0b0f1a; --card:#141b2e; --line:#24304d; --txt:#e8edf7; --mut:#8b96b3;
-          --acc:#4f8cff; --acc2:#7c5cff; --ok:#2fbf71; --err:#ff5d6c; }
+  :root { --bg:#0b0f1a; --card:#141b2e; --card2:#1a2340; --line:#24304d; --txt:#e8edf7;
+          --mut:#8b96b3; --acc:#4f8cff; --acc2:#7c5cff; --ok:#2fbf71; --err:#ff5d6c;
+          --warn:#e8a13c; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-         min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 64px; }
-  header { text-align:center; margin:24px 0 28px; }
-  header h1 { font-size:32px; letter-spacing:.5px; }
-  header h1 span { background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text;
-                   background-clip:text; color:transparent; }
-  header p { color:var(--mut); margin-top:8px; font-size:14px; }
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:0 16px 64px; }
+
+  /* ---------- top bar + drawer ---------- */
+  .topbar { width:100%; max-width:640px; display:flex; align-items:center; gap:12px; padding:14px 4px; }
+  .topbar .title { font-size:17px; font-weight:600; }
+  .iconbtn { background:none; border:0; color:var(--txt); cursor:pointer; padding:8px; border-radius:8px;
+             display:inline-flex; align-items:center; justify-content:center; }
+  .iconbtn:hover { background:var(--card); }
+  .iconbtn svg { width:22px; height:22px; }
+  #scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none;
+           transition:opacity .25s; z-index:40; }
+  #scrim.show { opacity:1; pointer-events:auto; }
+  #drawer { position:fixed; top:0; left:0; bottom:0; width:270px; background:var(--card);
+            border-right:1px solid var(--line); z-index:50; transform:translateX(-105%);
+            transition:transform .28s ease; padding:20px 12px; display:flex; flex-direction:column; gap:4px; }
+  #drawer.open { transform:translateX(0); }
+  #drawer .dbrand { font-size:20px; font-weight:700; padding:4px 12px 16px; }
+  #drawer .dbrand span { background:linear-gradient(90deg,var(--acc),var(--acc2));
+                        -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #drawer a { color:var(--txt); text-decoration:none; font-size:14px; padding:11px 12px;
+              border-radius:10px; display:block; }
+  #drawer a:hover { background:var(--card2); }
+  #drawer .dfoot { margin-top:auto; font-size:11px; color:var(--mut); padding:12px; }
+
+  header.hero { text-align:center; margin:14px 0 22px; }
+  header.hero h1 { font-size:32px; letter-spacing:.5px; }
+  header.hero h1 span { background:linear-gradient(90deg,var(--acc),var(--acc2));
+                       -webkit-background-clip:text; background-clip:text; color:transparent; }
+  header.hero p { color:var(--mut); margin-top:8px; font-size:14px; }
+
   main { width:100%; max-width:640px; }
+
+  /* ---------- dropzone ---------- */
   #dropzone { border:2px dashed var(--line); border-radius:16px; background:var(--card);
-              padding:48px 24px; text-align:center; cursor:pointer; transition:.15s; }
+              padding:44px 24px; text-align:center; cursor:pointer; transition:.15s; }
   #dropzone:hover, #dropzone.over { border-color:var(--acc); background:#17203a; }
-  #dropzone .big { font-size:15px; font-weight:600; }
-  #dropzone .sub { color:var(--mut); font-size:13px; margin-top:8px; }
+  #dropzone .cloud { width:64px; height:64px; margin:0 auto 14px; background:var(--card2);
+                     border-radius:16px; display:flex; align-items:center; justify-content:center; }
+  #dropzone .cloud svg { width:32px; height:32px; color:var(--acc); }
+  #dropzone .dz-title { font-size:17px; font-weight:700; }
+  #dropzone .dz-or { color:var(--mut); font-size:13px; margin:10px 0; }
+  .btn-blue { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg,var(--acc),var(--acc2));
+              color:#fff; border:0; border-radius:10px; padding:12px 22px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btn-blue svg { width:16px; height:16px; }
+  #dropzone .dz-sub { color:var(--mut); font-size:12px; margin-top:14px; line-height:1.6; }
+
   .opts { display:flex; gap:12px; margin:16px 0; flex-wrap:wrap; }
   .opts label { flex:1 1 200px; font-size:12px; color:var(--mut); display:flex; flex-direction:column; gap:6px; }
   .opts input, .opts select { background:var(--card); border:1px solid var(--line); color:var(--txt);
       border-radius:10px; padding:10px 12px; font-size:14px; outline:none; }
   .opts input:focus, .opts select:focus { border-color:var(--acc); }
-  #uploads { display:flex; flex-direction:column; gap:12px; margin-top:8px; }
-  .up-card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-  .up-name { font-size:14px; font-weight:600; word-break:break-all; }
-  .up-meta { font-size:12px; color:var(--mut); margin-top:2px; }
+
+  /* ---------- uploads panel ---------- */
+  #uploadsPanel { background:var(--card); border:1px solid var(--line); border-radius:14px;
+                  margin-top:16px; overflow:hidden; }
+  .up-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px;
+             border-bottom:1px solid var(--line); font-size:14px; font-weight:600; }
+  .up-head .sum { font-size:12px; color:var(--mut); font-weight:400; }
+  .up-entry { padding:14px 16px; border-bottom:1px solid var(--line); }
+  .up-entry:last-child { border-bottom:0; }
+  .up-row1 { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .up-fname { font-size:14px; font-weight:600; word-break:break-all; }
+  .badge { font-size:10px; font-weight:700; letter-spacing:.6px; padding:4px 10px; border-radius:99px;
+           background:var(--card2); color:var(--mut); white-space:nowrap; }
+  .badge.uploading { background:rgba(79,140,255,.15); color:var(--acc); }
+  .badge.complete { background:rgba(47,191,113,.15); color:var(--ok); }
+  .badge.preparing { background:rgba(232,161,60,.15); color:var(--warn); }
+  .badge.error { background:rgba(255,93,108,.15); color:var(--err); }
   .up-bar { height:8px; background:#0b0f1a; border-radius:99px; margin-top:10px; overflow:hidden; }
   .up-fill { height:100%; width:0%; border-radius:99px;
              background:linear-gradient(90deg,var(--acc),var(--acc2)); transition:width .15s; }
-  .up-status { font-size:12px; color:var(--mut); margin-top:8px; }
-  .up-card.error .up-status { color:var(--err); }
-  .up-result { display:flex; gap:8px; margin-top:10px; align-items:center; }
-  .up-result input { flex:1; background:#0b0f1a; border:1px solid var(--line); color:var(--txt);
+  .up-row2 { display:flex; gap:12px; margin-top:8px; font-size:12px; color:var(--mut); }
+  .up-done { margin-top:10px; }
+  .up-done .linkrow { display:flex; gap:8px; }
+  .up-done input { flex:1; min-width:0; background:#0b0f1a; border:1px solid var(--line); color:var(--txt);
       border-radius:8px; padding:8px 10px; font-size:12px; }
   .btn { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:#fff; border:0; border-radius:8px;
-         padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+         padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none;
+         display:inline-flex; align-items:center; justify-content:center; }
   .btn.ghost { background:transparent; border:1px solid var(--line); }
+  .up-err { color:var(--err); font-size:12px; margin-top:8px; }
+
+  /* ---------- why section ---------- */
+  section.why { margin-top:36px; text-align:center; }
+  section.why .kicker { color:var(--acc); font-size:12px; font-weight:700; letter-spacing:1.5px; }
+  section.why h2 { font-size:24px; margin:8px 0; }
+  section.why p { color:var(--mut); font-size:14px; line-height:1.7; }
+
+  /* ---------- my files ---------- */
   section.mine { margin-top:32px; width:100%; }
   section.mine h2 { font-size:16px; margin-bottom:12px; }
   .myfile { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line);
@@ -50,9 +109,45 @@
   .myfile a { color:var(--acc); text-decoration:none; font-size:12px; white-space:nowrap; }
   .myfile button { background:none; border:0; color:var(--err); cursor:pointer; font-size:14px; }
   .empty { color:var(--mut); font-size:13px; text-align:center; padding:16px; }
+
   footer { margin-top:48px; color:var(--mut); font-size:12px; text-align:center; line-height:1.9; }
   footer a { color:var(--mut); text-decoration:underline; text-underline-offset:3px; }
   footer a:hover { color:#fff; }
+
+  /* ---------- done sheet ---------- */
+  #doneSheet { position:fixed; inset:0; z-index:60; display:flex; align-items:flex-end; justify-content:center;
+               background:rgba(0,0,0,.6); }
+  #doneSheet[hidden] { display:none; }
+  .sheet { width:100%; max-width:560px; max-height:92vh; overflow-y:auto; background:var(--card);
+           border:1px solid var(--line); border-bottom:0; border-radius:20px 20px 0 0; padding:20px 20px 28px;
+           animation:sheetup .28s ease; }
+  @keyframes sheetup { from { transform:translateY(40px); opacity:.6; } to { transform:none; opacity:1; } }
+  .sheet-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .sheet-head h2 { font-size:18px; }
+  .sheet .lbl { font-size:12px; color:var(--mut); margin:12px 0 6px; }
+  .linkrow { display:flex; gap:8px; }
+  .linkrow input { flex:1; min-width:0; background:#0b0f1a; border:1px solid var(--line); color:var(--txt);
+      border-radius:10px; padding:12px; font-size:13px; }
+  .anysub { font-size:12px; color:var(--mut); margin-top:6px; }
+  #sheetQr { display:flex; justify-content:center; margin:18px 0 8px; }
+  #sheetQr svg { width:180px; height:180px; border-radius:12px; background:#fff; padding:8px; }
+  .qrsub { text-align:center; font-size:12px; color:var(--mut); }
+  .stats { display:flex; gap:8px; margin:16px 0 4px; }
+  .stat { flex:1; background:var(--card2); border:1px solid var(--line); border-radius:10px;
+          padding:10px 6px; text-align:center; font-size:12px; color:var(--mut); }
+  .stat b { display:block; font-size:14px; color:var(--txt); margin-bottom:2px; }
+  #perFileToggle { width:100%; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+      border-radius:10px; padding:12px; font-size:13px; text-align:left; cursor:pointer; margin-top:10px; }
+  #perFileBody { font-size:12px; color:var(--mut); padding:10px 4px; line-height:1.8; }
+  .sheet .note { font-size:12px; color:var(--mut); line-height:1.7; margin:14px 0;
+                 background:rgba(232,161,60,.08); border:1px solid rgba(232,161,60,.3);
+                 border-radius:10px; padding:12px; }
+  .sheet-actions { display:flex; gap:10px; }
+  .sheet-actions .btn, .sheet-actions .btn-blue { flex:1; padding:13px; font-size:14px; }
+  .sheet-actions .ghostbtn { flex:1; background:transparent; border:1px solid var(--line); color:var(--txt);
+      border-radius:10px; padding:13px; font-size:14px; font-weight:600; cursor:pointer; }
+
+  /* ---------- toast ---------- */
   #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(16px);
            background:#1a2340; border:1px solid var(--line); color:var(--txt);
            border-radius:12px; padding:12px 20px; font-size:13px; text-align:center;
@@ -63,15 +158,40 @@
 </style>
 </head>
 <body>
-<header>
+
+<div class="topbar">
+  <button class="iconbtn" id="menuBtn" aria-label="Menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+  </button>
+  <span class="title">Home</span>
+</div>
+
+<div id="scrim"></div>
+<nav id="drawer" aria-label="Main menu">
+  <div class="dbrand">Files<span>Devxyz</span></div>
+  <a href="/">Home</a>
+  <a href="/privacy.html">Privacy Policy</a>
+  <a href="/terms.html">Terms of Service</a>
+  <div class="dfoot">Powered by Jepong Devxyz</div>
+</nav>
+
+<header class="hero">
   <h1>Files<span>Devxyz</span></h1>
   <p>Your own file host. Upload anything, share the link.</p>
 </header>
 
 <main>
   <div id="dropzone" role="button" tabindex="0" aria-label="Upload files">
-    <div class="big">Drop files here or tap to browse</div>
-    <div class="sub">Files go straight to your private storage — links look like <b>/f/AbC12345</b></div>
+    <div class="cloud">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6.5 6.5 0 0 0-12.7 1.61A4 4 0 0 0 6 19h11.5z"/><path d="M12 12v6"/><path d="m9 15 3-3 3 3"/></svg>
+    </div>
+    <div class="dz-title">Drag &amp; drop your files here</div>
+    <div class="dz-or">or</div>
+    <button class="btn-blue" id="selectBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Select files
+    </button>
+    <div class="dz-sub">Files go straight to your private storage — links look like <b>/f/AbC12345</b>.<br>Max 2 GB per file · auto-deleted after 7 days.</div>
   </div>
   <input type="file" id="fileInput" hidden multiple>
 
@@ -90,7 +210,16 @@
     </label>
   </div>
 
-  <div id="uploads"></div>
+  <div id="uploadsPanel" hidden>
+    <div class="up-head"><span>Uploads</span><span class="sum" id="upSummary"></span></div>
+    <div id="upEntries"></div>
+  </div>
+
+  <section class="why">
+    <div class="kicker">WHY FILESDEVXYZ</div>
+    <h2>Everything you need to store and share</h2>
+    <p>Your own private file host — no accounts, no ads, no waiting rooms.<br>Uploads go straight to your storage, links are short and shareable.</p>
+  </section>
 
   <section class="mine">
     <h2>My files</h2>
@@ -104,6 +233,36 @@
   <div>Powered by Jepong Devxyz</div>
 </footer>
 
+<div id="doneSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Upload complete">
+    <div class="sheet-head">
+      <h2>Upload complete</h2>
+      <button class="iconbtn" id="sheetX" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <div class="lbl">Share link</div>
+    <div class="linkrow">
+      <input id="sheetLink" readonly>
+      <button class="btn" id="sheetCopy" type="button">Copy</button>
+    </div>
+    <div class="anysub">Anyone with the link can open it.</div>
+    <div id="sheetQr"></div>
+    <div class="qrsub">Scan to open this file on another device</div>
+    <div class="stats">
+      <div class="stat"><b>1</b>file</div>
+      <div class="stat"><b id="statSize">–</b>size</div>
+      <div class="stat"><b id="statTime">–</b>time</div>
+      <div class="stat"><b id="statSpeed">–</b>avg speed</div>
+    </div>
+    <button id="perFileToggle" type="button">› Per-file details (1)</button>
+    <div id="perFileBody" hidden></div>
+    <div class="note">This link shares the file only. Files auto-delete <b>7 days</b> after upload — download them again to keep them.</div>
+    <div class="sheet-actions">
+      <button class="ghostbtn" id="sheetCloseBtn" type="button">Close</button>
+      <a class="btn-blue" id="sheetOpen" href="#" target="_blank" rel="noopener">Open file</a>
+    </div>
+  </div>
+</div>
+
 <div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><span class="brand">Powered by Jepong Devxyz</span></div>
 
 <script>
@@ -113,6 +272,26 @@
   var LS_KEY = 'filesdevxyz:files';
 
   function el(id) { return document.getElementById(id); }
+  function fmtBytes(n) {
+    if (n == null) return '';
+    var u = ['B','KB','MB','GB','TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (Math.round(n * 10) / 10) + ' ' + u[i];
+  }
+  function fmtSpeed(bps) {
+    if (!bps || bps <= 0) return '0 B/s';
+    return fmtBytes(bps) + '/s';
+  }
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
 
   // ---------- bottom-center branded toast ----------
   var toastTimer = null;
@@ -122,17 +301,6 @@
     t.classList.add('show');
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
-  }
-  function fmtBytes(n) {
-    if (!n && n !== 0) return '';
-    var u = ['B','KB','MB','GB','TB'], i = 0;
-    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
-    return (Math.round(n * 10) / 10) + ' ' + u[i];
-  }
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
-    });
   }
 
   // ---------- my files (localStorage) ----------
@@ -169,15 +337,22 @@
     });
   }
 
-  // ---------- XHR PUT with progress ----------
+  // ---------- XHR PUT with progress + speed ----------
   function putWithProgress(url, blob, contentType, onProgress, retries) {
     retries = retries == null ? 1 : retries;
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
       xhr.open('PUT', url);
       if (contentType) xhr.setRequestHeader('Content-Type', contentType);
+      var lastT = Date.now(), lastLoaded = 0;
       xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+        if (e.lengthComputable && onProgress) {
+          var now = Date.now();
+          var dt = (now - lastT) / 1000;
+          var speed = dt > 0 ? (e.loaded - lastLoaded) / dt : 0;
+          lastT = now; lastLoaded = e.loaded;
+          onProgress(e.loaded, e.total, speed);
+        }
       };
       xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -207,51 +382,129 @@
     return data;
   }
 
-  // ---------- upload flows ----------
-  function makeCard(file) {
-    var card = document.createElement('div');
-    card.className = 'up-card';
-    card.innerHTML =
-      '<div class="up-name">' + esc(file.name) + '</div>' +
-      '<div class="up-meta">' + esc(fmtBytes(file.size)) + '</div>' +
+  // ---------- uploads panel ----------
+  function ensurePanel() {
+    el('uploadsPanel').hidden = false;
+  }
+  function updateSummary() {
+    var entries = Array.prototype.slice.call(document.querySelectorAll('.up-entry'));
+    var active = entries.filter(function (e) { return e.dataset.state === 'uploading' || e.dataset.state === 'preparing'; });
+    var done = entries.length - active.length;
+    var txt = '';
+    if (active.length) {
+      var pct = active.map(function (e) { return Number(e.dataset.pct || 0); });
+      var avg = Math.round(pct.reduce(function (a, b) { return a + b; }, 0) / pct.length);
+      txt = active.length + ' active · ' + avg + '%';
+    } else if (done) {
+      txt = done + ' finished';
+    }
+    el('upSummary').textContent = txt;
+  }
+  function makeEntry(file) {
+    ensurePanel();
+    var entry = document.createElement('div');
+    entry.className = 'up-entry';
+    entry.dataset.state = 'preparing';
+    entry.dataset.pct = '0';
+    entry.innerHTML =
+      '<div class="up-row1"><span class="up-fname">' + esc(file.name) + '</span>' +
+      '<span class="badge preparing">PREPARING</span></div>' +
       '<div class="up-bar"><div class="up-fill"></div></div>' +
-      '<div class="up-status">Preparing…</div>' +
-      '<div class="up-result" hidden></div>';
-    el('uploads').prepend(card);
-    return {
-      card: card,
-      fill: card.querySelector('.up-fill'),
-      status: card.querySelector('.up-status'),
-      result: card.querySelector('.up-result'),
-      setProgress: function (loaded, total) {
+      '<div class="up-row2"><span class="up-pct">0%</span>' +
+      '<span class="up-speed">0 B/s</span><span class="up-elapsed">0:00</span></div>' +
+      '<div class="up-done" hidden></div>' +
+      '<div class="up-err" hidden></div>';
+    el('upEntries').prepend(entry);
+    updateSummary();
+    var ui = {
+      entry: entry,
+      startT: Date.now(),
+      setBadge: function (label, cls) {
+        var b = entry.querySelector('.badge');
+        b.textContent = label;
+        b.className = 'badge ' + cls;
+      },
+      setProgress: function (loaded, total, speed) {
         var pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-        this.fill.style.width = pct + '%';
-        this.status.textContent = 'Uploading… ' + pct + '%';
+        entry.dataset.pct = String(pct);
+        entry.dataset.state = 'uploading';
+        this.setBadge('UPLOADING', 'uploading');
+        entry.querySelector('.up-fill').style.width = pct + '%';
+        entry.querySelector('.up-pct').textContent = pct + '%';
+        if (speed != null) entry.querySelector('.up-speed').textContent = fmtSpeed(speed);
+        entry.querySelector('.up-elapsed').textContent = fmtTime((Date.now() - this.startT) / 1000);
+        updateSummary();
+      },
+      preparing: function (msg) {
+        entry.dataset.state = 'preparing';
+        this.setBadge('PREPARING', 'preparing');
+        entry.querySelector('.up-elapsed').textContent = fmtTime((Date.now() - this.startT) / 1000);
+        updateSummary();
       },
       fail: function (msg) {
-        card.classList.add('error');
-        this.status.textContent = 'Failed: ' + msg;
+        entry.dataset.state = 'error';
+        this.setBadge('FAILED', 'error');
+        var e = entry.querySelector('.up-err');
+        e.hidden = false;
+        e.textContent = msg;
         toast('Upload failed: ' + msg);
+        updateSummary();
       },
       done: function (id, downloadUrl, file) {
-        this.fill.style.width = '100%';
-        this.status.textContent = 'Done ✓';
+        entry.dataset.state = 'done';
+        entry.dataset.pct = '100';
+        this.setBadge('COMPLETE', 'complete');
+        entry.querySelector('.up-fill').style.width = '100%';
+        entry.querySelector('.up-pct').textContent = '100%';
+        var elapsed = (Date.now() - this.startT) / 1000;
+        entry.querySelector('.up-elapsed').textContent = fmtTime(elapsed);
         var abs = location.origin + downloadUrl;
-        this.result.hidden = false;
-        this.result.innerHTML =
-          '<input readonly value="' + esc(abs) + '">' +
+        var doneBox = entry.querySelector('.up-done');
+        doneBox.hidden = false;
+        doneBox.innerHTML =
+          '<div class="linkrow"><input readonly value="' + esc(abs) + '">' +
           '<button class="btn ghost up-copy" type="button">Copy</button>' +
-          '<a class="btn up-link" href="' + esc(downloadUrl) + '" target="_blank" rel="noopener">Open</a>';
-        var input = this.result.querySelector('input');
-        this.result.querySelector('.up-copy').addEventListener('click', function () {
+          '<a class="btn up-open" href="' + esc(downloadUrl) + '" target="_blank" rel="noopener">Open</a></div>';
+        var input = doneBox.querySelector('input');
+        doneBox.querySelector('.up-copy').addEventListener('click', function () {
           copyText(abs, input);
           toast('Link copied to clipboard');
         });
         saveToMyFiles({ id: id, name: file.name, size: file.size, url: downloadUrl, at: Date.now() });
-        toast('Upload complete — link ready');
+        updateSummary();
+        showDoneSheet(id, downloadUrl, file, elapsed);
       },
     };
+    return ui;
   }
+
+  // ---------- done sheet ----------
+  function showDoneSheet(id, downloadUrl, file, elapsedSec) {
+    var abs = location.origin + downloadUrl;
+    el('sheetLink').value = abs;
+    el('sheetOpen').href = downloadUrl;
+    el('statSize').textContent = fmtBytes(file.size);
+    el('statTime').textContent = fmtTime(elapsedSec);
+    var avg = elapsedSec > 0 ? file.size / elapsedSec : 0;
+    el('statSpeed').textContent = fmtSpeed(avg);
+    el('perFileBody').hidden = true;
+    el('perFileBody').innerHTML =
+      '<div><b>' + esc(file.name) + '</b></div>' +
+      '<div>Size: ' + esc(fmtBytes(file.size)) + '</div>' +
+      '<div>Type: ' + esc(file.type || 'unknown') + '</div>' +
+      '<div>Link: ' + esc(abs) + '</div>';
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(abs);
+      qr.make();
+      el('sheetQr').innerHTML = qr.createSvgTag({ scalable: true });
+    } catch (e) {
+      el('sheetQr').innerHTML = '';
+    }
+    el('doneSheet').hidden = false;
+    toast('Upload complete — link ready');
+  }
+  function hideDoneSheet() { el('doneSheet').hidden = true; }
 
   function copyText(text, input) {
     function fallback() {
@@ -276,30 +529,30 @@
   }
 
   async function uploadSingle(file, ui) {
-    ui.status.textContent = 'Requesting upload slot…';
+    ui.preparing('Requesting upload slot…');
     var signed = await postJSON('/api/sign-upload', signPayload(file));
     await putWithProgress(signed.uploadUrl, file, file.type || 'application/octet-stream',
-      function (loaded, total) { ui.setProgress(loaded, total); });
+      function (loaded, total, speed) { ui.setProgress(loaded, total, speed); });
     ui.done(signed.id, signed.downloadUrl, file);
   }
 
   async function uploadMultipart(file, ui) {
-    ui.status.textContent = 'Starting multipart upload…';
+    ui.preparing('Starting multipart upload…');
     var signed = await postJSON('/api/sign-part', signPayload(file));
     var partSize = signed.partSize;
     var parts = [];
-    var done_bytes = 0;
+    var doneBytes = 0;
     for (var i = 0; i < signed.partUrls.length; i++) {
       var start = i * partSize;
       var end = Math.min(start + partSize, file.size);
       var blob = file.slice(start, end);
       var etag = await putWithProgress(signed.partUrls[i], blob, null,
-        function (loaded) { ui.setProgress(done_bytes + loaded, file.size); });
-      done_bytes = end;
-      ui.setProgress(done_bytes, file.size);
+        function (loaded, speed) { ui.setProgress(doneBytes + loaded, file.size, speed); });
+      doneBytes = end;
+      ui.setProgress(doneBytes, file.size, 0);
       parts.push({ ETag: etag, PartNumber: i + 1 });
     }
-    ui.status.textContent = 'Finalizing…';
+    ui.preparing('Finalizing…');
     var done = await postJSON('/api/complete-multipart', {
       key: signed.key, uploadId: signed.uploadId, parts: parts,
     });
@@ -308,7 +561,7 @@
 
   async function startUpload(file) {
     if (!file || file.size <= 0) return;
-    var ui = makeCard(file);
+    var ui = makeEntry(file);
     try {
       if (file.size > SINGLE_PART_MAX) await uploadMultipart(file, ui);
       else await uploadSingle(file, ui);
@@ -317,9 +570,23 @@
     }
   }
 
-  // ---------- dropzone wiring ----------
-  var dz = el('dropzone'), fi = el('fileInput');
-  dz.addEventListener('click', function () { fi.click(); });
+  // ---------- drawer ----------
+  function openDrawer() {
+    el('drawer').classList.add('open');
+    el('scrim').classList.add('show');
+  }
+  function closeDrawer() {
+    el('drawer').classList.remove('open');
+    el('scrim').classList.remove('show');
+  }
+
+  // ---------- wiring ----------
+  var dz = el('dropzone'), fi = el('fileInput'), sel = el('selectBtn');
+  sel.addEventListener('click', function (e) { e.stopPropagation(); fi.click(); });
+  dz.addEventListener('click', function (e) {
+    if (e.target.closest('#selectBtn')) return;
+    fi.click();
+  });
   dz.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
   });
@@ -336,6 +603,23 @@
   dz.addEventListener('drop', function (e) {
     var files = (e.dataTransfer && e.dataTransfer.files) || [];
     Array.prototype.forEach.call(files, startUpload);
+  });
+
+  el('menuBtn').addEventListener('click', openDrawer);
+  el('scrim').addEventListener('click', closeDrawer);
+
+  el('sheetX').addEventListener('click', hideDoneSheet);
+  el('sheetCloseBtn').addEventListener('click', hideDoneSheet);
+  el('doneSheet').addEventListener('click', function (e) {
+    if (e.target === el('doneSheet')) hideDoneSheet();
+  });
+  el('sheetCopy').addEventListener('click', function () {
+    copyText(el('sheetLink').value, el('sheetLink'));
+    toast('Link copied to clipboard');
+  });
+  el('perFileToggle').addEventListener('click', function () {
+    var body = el('perFileBody');
+    body.hidden = !body.hidden;
   });
 
   document.addEventListener('DOMContentLoaded', renderMyFiles);
