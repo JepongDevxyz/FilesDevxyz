@@ -21,6 +21,12 @@ f.html      →  GET  /api/resolve?id=<id>         (password/expiry check → pr
 - Passwords: SHA-256 hash in `x-amz-meta-pw` object metadata (constant-time compare)
 - Expiry: epoch-ms in `x-amz-meta-exp` metadata (410 when past)
 - "My files" list lives in `localStorage` on the uploader's device
+- **Storage cap:** uploads are refused with HTTP 507 before the bucket can
+  grow past `STORAGE_CAP_GB` (default 9GB), so the R2 free tier is never
+  exceeded. Set `STORAGE_CAP_GB=0` to disable.
+- **Auto-delete:** `/api/cleanup` runs daily via Vercel Cron (`vercel.json`)
+  and deletes every object older than `RETENTION_DAYS` (default 7).
+  Guarded by `CRON_SECRET` (Bearer token) — set a long random string in Vercel.
 
 ## Setup
 

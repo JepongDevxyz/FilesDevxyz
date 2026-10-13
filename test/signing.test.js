@@ -35,7 +35,8 @@ const ENV = {
 function buildHandlerWith(captured, envOverrides = {}) {
   Object.assign(process.env, ENV, envOverrides);
   return buildHandler({
-    makeClient: () => ({ __fake: true }),
+    // Empty bucket listing keeps the storage-cap check out of the way.
+    makeClient: () => ({ async send() { return { Contents: [], IsTruncated: false }; } }),
     getSignedUrl: makePresigner(captured),
     now: () => FIXED_NOW,
   });
@@ -147,7 +148,7 @@ describe('sign-upload', () => {
   it('returns 500 when R2 config is missing', async () => {
     for (const k of Object.keys(ENV)) delete process.env[k];
     const handler = buildHandler({
-      makeClient: () => ({}),
+      makeClient: () => ({ async send() { return { Contents: [], IsTruncated: false }; } }),
       getSignedUrl: makePresigner([]),
       now: () => FIXED_NOW,
     });

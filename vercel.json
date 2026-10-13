@@ -1,1 +1,1 @@
-{"rewrites":[{"destination":"/f.html?id=:id","source":"/f/:id"}]}
+{"crons":[{"path":"/api/cleanup","schedule":"0 3 * * *"}],"rewrites":[{"destination":"/f.html?id=:id","source":"/f/:id"}]}

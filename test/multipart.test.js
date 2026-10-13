@@ -37,6 +37,9 @@ function makeFakeClient(captured) {
     __fake: true,
     async send(command) {
       captured.push(command);
+      if (command.constructor.name === 'ListObjectsV2Command') {
+        return { Contents: [], IsTruncated: false }; // empty bucket: under the storage cap
+      }
       if (command.constructor.name === 'CreateMultipartUploadCommand') {
         return { UploadId: 'upload-123' };
       }

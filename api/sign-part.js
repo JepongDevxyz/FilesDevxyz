@@ -1,6 +1,7 @@
 import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { makeS3Client, requireConfig } from '../lib/r2.js';
+import { getBucketUsageBytes, wouldExceedCap } from '../lib/cap.js';
 import { genId, sanitizeFilename } from '../lib/id.js';
 import { validateUpload, hashPassword, expiryFromHours } from '../lib/meta.js';
 import { SINGLE_PART_MAX } from './sign-upload.js';
@@ -34,6 +35,14 @@ export function buildSignPartHandler(deps = {}) {
         });
       }
 
+      const client = makeClient(process.env);
+
+      // Storage cap: same guard as single uploads — never exceed STORAGE_CAP_GB.
+      const usage = await getBucketUsageBytes(client, cfg.bucket);
+      if (wouldExceedCap(usage, size, cfg.storageCapGb)) {
+        return res.status(507).json({ error: 'storage is full — delete old files to free space' });
+      }
+
       const id = genId();
       const name = sanitizeFilename(req.body.filename);
       const key = `${id}/${name}`;
@@ -47,7 +56,6 @@ export function buildSignPartHandler(deps = {}) {
       const exp = expiryFromHours(req.body.expiresInHours, now());
       if (exp) metadata['x-amz-meta-exp'] = exp;
 
-      const client = makeClient(process.env);
       const { UploadId } = await client.send(
         new CreateMultipartUploadCommand({
           Bucket: cfg.bucket,
