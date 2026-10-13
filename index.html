@@ -50,7 +50,9 @@
   .myfile a { color:var(--acc); text-decoration:none; font-size:12px; white-space:nowrap; }
   .myfile button { background:none; border:0; color:var(--err); cursor:pointer; font-size:14px; }
   .empty { color:var(--mut); font-size:13px; text-align:center; padding:16px; }
-  footer { margin-top:48px; color:var(--mut); font-size:12px; }
+  footer { margin-top:48px; color:var(--mut); font-size:12px; text-align:center; line-height:1.9; }
+  footer a { color:var(--mut); text-decoration:underline; text-underline-offset:3px; }
+  footer a:hover { color:#fff; }
 </style>
 </head>
 <body>
@@ -89,7 +91,11 @@
   </section>
 </main>
 
-<footer>Files auto-delete 7 days after upload · Powered by Jepong Devxyz</footer>
+<footer>
+  <div>Files auto-delete 7 days after upload.</div>
+  <div><a href="/privacy.html">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms.html">Terms of Service</a></div>
+  <div>Powered by Jepong Devxyz</div>
+</footer>
 
 <script>
 (function () {
