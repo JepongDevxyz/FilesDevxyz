@@ -47,6 +47,15 @@ function installMocks(window) {
         json: async () => ({ id: 'MpT98765', key: 'MpT98765/big.apk', downloadUrl: '/f/MpT98765' }),
       };
     }
+    if (url === '/api/finalize') {
+      if (window.__finalizeShouldFail) {
+        return { ok: false, status: 500, json: async () => ({ error: 'copy failed' }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({ ok: true, id: body.id, downloadUrl: '/f/' + body.id }),
+      };
+    }
     throw new Error('unexpected fetch: ' + url);
   };
 
@@ -233,6 +242,47 @@ describe('index.html gofile-style upload flow', () => {
     assert.ok(cs.display === 'flex' || cs.display === 'inline-flex', 'link button should be a flex box, got ' + cs.display);
     assert.equal(cs.alignItems, 'center', 'link button text must be vertically centered');
     assert.equal(cs.justifyContent, 'center', 'link button text must be horizontally centered');
+    dom.window.close();
+  });
+
+  it('finalize is called with the password after upload, before the done sheet', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    window.document.getElementById('pwInput').value = 'secret123';
+    window.document.getElementById('expirySelect').value = '24';
+    const file = new window.File(['x'.repeat(1000)], 'secret.apk', {
+      type: 'application/vnd.android.package-archive',
+    });
+
+    dropFile(window, file);
+    await settle();
+
+    const fin = window.__fetchCalls.find((c) => c.url === '/api/finalize');
+    assert.ok(fin, 'expected a call to /api/finalize');
+    assert.equal(fin.body.id, 'AbC12345');
+    assert.equal(fin.body.password, 'secret123');
+    assert.equal(fin.body.expiresInHours, 24);
+    assert.equal(fin.body.filename, 'secret.apk');
+
+    // done sheet only shows after finalize succeeded
+    assert.equal(window.document.getElementById('doneSheet').hidden, false);
+    dom.window.close();
+  });
+
+  it('failed finalize → upload marked failed, no done sheet', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    window.__finalizeShouldFail = true;
+    const file = new window.File(['x'.repeat(1000)], 'a.png', { type: 'image/png' });
+
+    dropFile(window, file);
+    await settle();
+
+    assert.equal(window.document.getElementById('doneSheet').hidden, true);
+    const badge = window.document.querySelector('.up-entry .badge');
+    assert.match(badge.textContent, /failed/i);
+    const toast = window.document.getElementById('toast');
+    assert.ok(toast.classList.contains('show'));
     dom.window.close();
   });
 

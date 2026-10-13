@@ -535,7 +535,34 @@
     var signed = await postJSON('/api/sign-upload', signPayload(file));
     await putWithProgress(signed.uploadUrl, file, file.type || 'application/octet-stream',
       function (loaded, total, speed) { ui.setProgress(loaded, total, speed); });
+    // Presigned PUTs can't carry x-amz-meta-* (R2 drops them), so the
+    // password/expiry/name are applied server-side here.
+    ui.preparing('Applying settings…');
+    await finalizeUpload(signed.id, file);
     ui.done(signed.id, signed.downloadUrl, file);
+  }
+
+  function finalizePayload(id, file) {
+    var p = {
+      id: id,
+      filename: file.name,
+      contentType: file.type || 'application/octet-stream',
+    };
+    var pw = el('pwInput').value;
+    if (pw) p.password = pw;
+    var exp = el('expirySelect').value;
+    if (exp) p.expiresInHours = Number(exp);
+    return p;
+  }
+
+  async function finalizeUpload(id, file) {
+    var lastErr = null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await postJSON('/api/finalize', finalizePayload(id, file));
+      } catch (e) { lastErr = e; }
+    }
+    throw new Error('could not apply settings (' + (lastErr && lastErr.message) + ')');
   }
 
   async function uploadMultipart(file, ui) {

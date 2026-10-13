@@ -3,7 +3,7 @@ import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { makeS3Client, requireConfig } from '../lib/r2.js';
 import { getBucketUsageBytes, wouldExceedCap } from '../lib/cap.js';
 import { genId, sanitizeFilename } from '../lib/id.js';
-import { validateUpload, hashPassword, expiryFromHours } from '../lib/meta.js';
+import { validateUpload, buildFileMetadata } from '../lib/meta.js';
 import { SINGLE_PART_MAX } from './sign-upload.js';
 
 // 10MB per part — good balance for mobile networks.
@@ -47,14 +47,15 @@ export function buildSignPartHandler(deps = {}) {
       const name = sanitizeFilename(req.body.filename);
       const key = `${id}/${name}`;
 
-      const metadata = {
-        'x-amz-meta-name': encodeURIComponent(req.body.filename.trim()),
-      };
-      if (req.body.password) {
-        metadata['x-amz-meta-pw'] = hashPassword(req.body.password);
-      }
-      const exp = expiryFromHours(req.body.expiresInHours, now());
-      if (exp) metadata['x-amz-meta-exp'] = exp;
+      // Metadata on the server-side CreateMultipartUpload IS stored on the
+      // final object (unlike presigned PUTs) — shared helper keeps it
+      // identical to what /api/finalize applies for single uploads.
+      const metadata = buildFileMetadata({
+        filename: req.body.filename,
+        password: req.body.password,
+        expiresInHours: req.body.expiresInHours,
+        now: now(),
+      });
 
       const { UploadId } = await client.send(
         new CreateMultipartUploadCommand({

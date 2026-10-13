@@ -75,7 +75,7 @@ describe('sign-upload', () => {
     assert.equal(opts.expiresIn, 900); // 15 min to complete the upload
   });
 
-  it('stores password hash + expiry + original name in object metadata', async () => {
+  it('does NOT bake metadata into the presigned PUT (R2 would silently drop it)', async () => {
     const captured = [];
     const handler = buildHandlerWith(captured);
     const res = makeRes();
@@ -85,10 +85,8 @@ describe('sign-upload', () => {
     }, res);
 
     assert.equal(res.statusCode, 200);
-    const meta = captured[0].command.input.Metadata;
-    assert.equal(meta['x-amz-meta-pw'], hashPassword('s3cret'));
-    assert.equal(meta['x-amz-meta-exp'], String(FIXED_NOW + 24 * 3600_000));
-    assert.equal(decodeURIComponent(meta['x-amz-meta-name']), 'My App v2.apk');
+    // Metadata rides along via /api/finalize after the PUT instead.
+    assert.equal(captured[0].command.input.Metadata, undefined);
   });
 
   it('rejects missing filename', async () => {

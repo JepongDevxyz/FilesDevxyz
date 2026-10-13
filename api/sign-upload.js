@@ -3,7 +3,7 @@ import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { makeS3Client, requireConfig } from '../lib/r2.js';
 import { getBucketUsageBytes, wouldExceedCap } from '../lib/cap.js';
 import { genId, sanitizeFilename } from '../lib/id.js';
-import { validateUpload, hashPassword, expiryFromHours } from '../lib/meta.js';
+import { validateUpload } from '../lib/meta.js';
 
 // Files at or under this size use a single presigned PUT. Bigger files
 // must use /api/sign-part + /api/complete-multipart.
@@ -52,22 +52,16 @@ export function buildHandler(deps = {}) {
       const name = sanitizeFilename(req.body.filename);
       const key = `${id}/${name}`;
 
-      const metadata = {
-        'x-amz-meta-name': encodeURIComponent(req.body.filename.trim()),
-      };
-      if (req.body.password) {
-        metadata['x-amz-meta-pw'] = hashPassword(req.body.password);
-      }
-      const exp = expiryFromHours(req.body.expiresInHours, now());
-      if (exp) metadata['x-amz-meta-exp'] = exp;
-
+      // NOTE: metadata is NOT baked into the presigned PUT — presigned URLs
+      // only sign the host header, so x-amz-meta-* would be silently dropped
+      // (R2 403s unsigned meta headers). The browser calls /api/finalize
+      // after the PUT to apply name/password/expiry server-side.
       const url = await getSignedUrl(
         client,
         new PutObjectCommand({
           Bucket: cfg.bucket,
           Key: key,
           ContentType: req.body.contentType,
-          Metadata: metadata,
         }),
         { expiresIn: UPLOAD_URL_TTL_SECONDS }
       );
