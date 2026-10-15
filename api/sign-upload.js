@@ -7,7 +7,7 @@ import { validateUpload } from '../lib/meta.js';
 
 // Files at or under this size use a single presigned PUT. Bigger files
 // must use /api/sign-part + /api/complete-multipart.
-export const SINGLE_PART_MAX = 100 * 1024 * 1024;
+export const SINGLE_PART_MAX = 1024 * 1024 * 1024; // 1GB
 // How long the browser has to finish the PUT.
 const UPLOAD_URL_TTL_SECONDS = 900;
 

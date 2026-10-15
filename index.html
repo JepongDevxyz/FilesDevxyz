@@ -269,7 +269,7 @@
 <script>
 (function () {
   'use strict';
-  var SINGLE_PART_MAX = 100 * 1024 * 1024; // must match api/sign-upload.js
+  var SINGLE_PART_MAX = 1024 * 1024 * 1024; // 1GB — must match api/sign-upload.js
   var LS_KEY = 'filesdevxyz:files';
 
   function el(id) { return document.getElementById(id); }

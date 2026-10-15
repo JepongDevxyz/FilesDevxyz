@@ -61,7 +61,7 @@ beforeEach(() => {
 const bigBody = (overrides = {}) => ({
   filename: 'big-movie.mkv',
   contentType: 'video/x-matroska',
-  size: 250 * 1024 * 1024, // 250MB → 25 parts of 10MB
+  size: 1.5 * 1024 ** 3, // 1.5GB → 154 parts of 10MB
   ...overrides,
 });
 
@@ -84,7 +84,7 @@ describe('sign-part', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.uploadId, 'upload-123');
     assert.match(res.body.id, /^[A-Za-z0-9]{8}$/);
-    assert.equal(res.body.partUrls.length, 25);
+    assert.equal(res.body.partUrls.length, 154);
     assert.ok(res.body.partUrls.every((u) => u.includes('sig=mock')));
     assert.equal(res.body.downloadUrl, `/f/${res.body.id}`);
 
@@ -92,7 +92,7 @@ describe('sign-part', () => {
     const partNums = captured
       .filter((c) => c.command.constructor.name === 'UploadPartCommand')
       .map((c) => c.command.input.PartNumber);
-    assert.deepEqual(partNums, Array.from({ length: 25 }, (_, i) => i + 1));
+    assert.deepEqual(partNums, Array.from({ length: 154 }, (_, i) => i + 1));
     // every part url targets the same key + uploadId
     assert.ok(captured.every((c) => c.command.input.Key === res.body.key));
     assert.ok(captured.every((c) => c.command.input.UploadId === 'upload-123'));

@@ -132,7 +132,7 @@ describe('sign-part storage cap', () => {
 
   it('rejects multipart start with 507 when over the cap', async () => {
     const handler = buildSignPartHandler({
-      // 8.95GB + ~100MB file > 9GB cap
+      // 8.95GB + ~1GB file > 9GB cap
       makeClient: () => listClient([{ Contents: [{ Size: 8.95 * GB }], IsTruncated: false }]),
       getSignedUrl: presigner,
     });

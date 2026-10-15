@@ -127,7 +127,7 @@ describe('sign-upload', () => {
   });
 
   it('rejects single-PUT for files over the multipart threshold', async () => {
-    assert.ok(SINGLE_PART_MAX === 100 * 1024 * 1024);
+    assert.ok(SINGLE_PART_MAX === 1024 ** 3, 'threshold must be 1GB');
     const handler = buildHandlerWith([]);
     const res = makeRes();
     await handler({ method: 'POST', body: { ...validBody(), size: SINGLE_PART_MAX + 1 } }, res);

@@ -182,13 +182,33 @@ describe('index.html gofile-style upload flow', () => {
     dom.window.close();
   });
 
-  it('drops a >100MB file → uses multipart sign-part + complete flow', async () => {
+  it('drops a 500MB file → single upload (under the 1GB threshold)', async () => {
+    const dom = bootDom();
+    const { window } = dom;
+    const file = new window.File(['x'.repeat(10)], 'mid.apk', {
+      type: 'application/vnd.android.package-archive',
+    });
+    Object.defineProperty(file, 'size', { value: 500 * 1024 * 1024 });
+
+    dropFile(window, file);
+    await settle();
+
+    const sign = window.__fetchCalls.find((c) => c.url === '/api/sign-upload');
+    assert.ok(sign, 'expected a call to /api/sign-upload');
+    const signPart = window.__fetchCalls.find((c) => c.url === '/api/sign-part');
+    assert.ok(!signPart, '500MB must NOT use multipart');
+    assert.equal(window.__xhrPuts.length, 1, 'single PUT expected');
+    assert.equal(window.document.getElementById('doneSheet').hidden, false);
+    dom.window.close();
+  });
+
+  it('drops a >1GB file → uses multipart sign-part + complete flow', async () => {
     const dom = bootDom();
     const { window } = dom;
     const file = new window.File(['x'.repeat(10)], 'big.apk', {
       type: 'application/vnd.android.package-archive',
     });
-    Object.defineProperty(file, 'size', { value: 250 * 1024 * 1024 });
+    Object.defineProperty(file, 'size', { value: 1.5 * 1024 ** 3 });
 
     dropFile(window, file);
     await settle(300);
@@ -197,8 +217,8 @@ describe('index.html gofile-style upload flow', () => {
     assert.ok(signPart, 'expected a call to /api/sign-part');
     const complete = window.__fetchCalls.find((c) => c.url === '/api/complete-multipart');
     assert.ok(complete, 'expected a call to /api/complete-multipart');
-    assert.equal(complete.body.parts.length, 25);
-    assert.equal(window.__xhrPuts.length, 25);
+    assert.equal(complete.body.parts.length, 154);
+    assert.equal(window.__xhrPuts.length, 154);
 
     const sheet = window.document.getElementById('doneSheet');
     assert.equal(sheet.hidden, false, 'done sheet should show for multipart too');
