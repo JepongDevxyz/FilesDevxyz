@@ -8,7 +8,8 @@ import { SINGLE_PART_MAX } from './sign-upload.js';
 
 // 10MB per part — good balance for mobile networks.
 export const PART_SIZE = 10 * 1024 * 1024;
-const PART_URL_TTL_SECONDS = 900;
+// 1 hour per part PUT — same allowance as single uploads.
+const PART_URL_TTL_SECONDS = 3600;
 
 export function buildSignPartHandler(deps = {}) {
   const {

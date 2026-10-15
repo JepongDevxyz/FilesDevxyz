@@ -8,8 +8,9 @@ import { validateUpload } from '../lib/meta.js';
 // Files at or under this size use a single presigned PUT. Bigger files
 // must use /api/sign-part + /api/complete-multipart.
 export const SINGLE_PART_MAX = 1024 * 1024 * 1024; // 1GB
-// How long the browser has to finish the PUT.
-const UPLOAD_URL_TTL_SECONDS = 900;
+// How long the browser has to finish the PUT (1 hour — enough for a 1GB
+// single upload even on slow mobile data).
+const UPLOAD_URL_TTL_SECONDS = 3600;
 
 // Injectable deps keep this unit-testable without real R2 credentials.
 // Vercel calls the default export (wired to the real AWS SDK).

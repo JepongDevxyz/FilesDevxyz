@@ -72,7 +72,7 @@ describe('sign-upload', () => {
     assert.equal(command.input.Bucket, 'filesdevxyz');
     assert.equal(command.input.Key, res.body.key);
     assert.equal(command.input.ContentType, 'application/vnd.android.package-archive');
-    assert.equal(opts.expiresIn, 900); // 15 min to complete the upload
+    assert.equal(opts.expiresIn, 3600); // 1 hour to complete the upload
   });
 
   it('does NOT bake metadata into the presigned PUT (R2 would silently drop it)', async () => {
